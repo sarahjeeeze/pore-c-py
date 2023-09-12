@@ -1,6 +1,7 @@
 """Digestion of unaligned concatemers."""
 import copy
-
+import os
+import re
 from Bio import Restriction
 from Bio.Seq import Seq
 
@@ -9,6 +10,7 @@ from pore_c_py import utils
 
 logger = utils.get_named_logger("Digest")
 
+collect_counts = {}
 
 def get_subread_modified_bases(align, start, end):
     """Get modified bases subread.
@@ -93,14 +95,27 @@ def digest_sequence(align, enzyme, tags_remove=None):
     # it or handle it in trimming, so force its removal by default.
     if tags_remove is None:
         tags_remove = {'mv'}
-
     concatemer_id = align.query_name
-    cut_points = [x - 1 for x in enzyme.search(Seq(align.query_sequence))]
+    if isinstance(enzyme, list):
+        the_enzyme = "none"
+        for i in enzyme:
+            cut_points = []
+            if i in align.query_sequence:
+                the_enzyme = i
+                for m in re.finditer(i, align.query_sequence):
+                    cut_points.append(m.end())
+                logger.info(str(the_enzyme)+':'+str(cut_points))
+                break
+    else:
+        cut_points = [x - 1 for x in enzyme.search(Seq(align.query_sequence))]
+        the_enzyme = str(enzyme)
     read_length = len(align.query_sequence)
     num_digits = len(str(read_length))
     intervals = splits_to_intervals(cut_points, read_length)
     num_intervals = len(intervals)
-
+    with open("per_concatemer_counts.csv", "a") as f:
+        filename = str(concatemer_id) + ',' + str(the_enzyme) + ',' + str(num_intervals) + '\n'
+        f.write(filename)
     for idx, (start, end) in enumerate(intervals):
         read = copy.copy(align)
         # trim the sequence and quality
@@ -128,9 +143,14 @@ def digest_sequence(align, enzyme, tags_remove=None):
         read.set_tag(
             utils.MONOMER_DATA_TAG,
             [start, end, read_length, idx, num_intervals])
+        read.set_tag("EZ",the_enzyme)
         utils.MonomerData.set_monomer_data(
                 read, start, end, read_length, idx, num_intervals)
         read.set_tag(utils.CONCATEMER_ID_TAG, concatemer_id, "Z")
+        if the_enzyme not in collect_counts:
+            collect_counts[the_enzyme] = num_intervals
+        else:
+            collect_counts[the_enzyme] += num_intervals
         yield read
 
 
@@ -148,16 +168,27 @@ def get_concatemer_seqs(input_file, enzyme, remove_tags=None):
     logger.info(f"Digesting unaligned sequences from {input_file}")
     n_concatemers = 0
     n_monomers = 0
-    enzyme = get_enzyme(enzyme)
+    # create a per concatemer file
+    open("per_concatemer_counts.csv", "w")
+    if os.path.isfile(enzyme):
+        with open(enzyme) as f:
+            cutters = f.read().split('\n')
+            list_of_cutters = cutters
+        enzyme = list_of_cutters
+    else:
+        enzyme = get_enzyme(enzyme)
     tags_remove = {"mv"}
     if remove_tags:
         tags_remove.update(set(remove_tags))
     for align in input_file.fetch(until_eof=True):
         n_concatemers += 1
         reads = digest_sequence(
-            align, enzyme, tags_remove)
+             align, enzyme, tags_remove)
         for read in reads:
             n_monomers += 1
             yield read
     logger.info(
         f"Found {n_monomers} monomers in {n_concatemers} concatemers.")
+    with open("per_barcode_counts.csv", "a") as f:
+        for k, v in collect_counts.items():
+            f.write(k + ',' + str(v) + '\n')
