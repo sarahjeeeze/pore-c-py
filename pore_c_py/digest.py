@@ -109,16 +109,13 @@ def digest_sequence(align, enzyme, tags_remove=None):
         cut_points = [x - 1 for x in enzyme.search(Seq(align.query_sequence))]
         the_enzyme = str(enzyme)
     
-
-    logger.info(cut_points)
     read_length = len(align.query_sequence)
     num_digits = len(str(read_length))
     intervals = splits_to_intervals(cut_points, read_length)
     num_intervals = len(intervals)
-    with open("new.csv", "a") as f:
-            test = str(concatemer_id) + ',' + str(the_enzyme) +',' + str(num_intervals) + '\n'
-            f.write(test)
-
+    with open("per_concatemer_counts.csv", "a") as f:
+        filename = str(concatemer_id) + ',' + str(the_enzyme) + ',' + str(num_intervals) + '\n'
+        f.write(filename)
     for idx, (start, end) in enumerate(intervals):
         read = copy.copy(align)
         # trim the sequence and quality
@@ -172,7 +169,6 @@ def get_concatemer_seqs(input_file, enzyme, remove_tags=None):
             cutters = f.read().split('\n')
             list_of_cutters = cutters
         enzyme = list_of_cutters
-        logger.info(enzyme)
     else:
         enzyme = get_enzyme(enzyme)
     tags_remove = {"mv"}
