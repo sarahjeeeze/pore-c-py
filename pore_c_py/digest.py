@@ -96,6 +96,7 @@ def digest_sequence(align, enzyme, tags_remove=None):
         tags_remove = {'mv'}
     concatemer_id = align.query_name
     if isinstance(enzyme, list):
+        the_enzyme = "none"
         for i in enzyme:
             cut_points = []
             if i in align.query_sequence:
@@ -103,16 +104,20 @@ def digest_sequence(align, enzyme, tags_remove=None):
                 for m in re.finditer(i, align.query_sequence):
                     cut_points.append(m.end())
                 logger.info(str(the_enzyme)+':'+str(cut_points))
-                
                 break
     else:
         cut_points = [x - 1 for x in enzyme.search(Seq(align.query_sequence))]
         the_enzyme = str(enzyme)
+    
+
     logger.info(cut_points)
     read_length = len(align.query_sequence)
     num_digits = len(str(read_length))
     intervals = splits_to_intervals(cut_points, read_length)
     num_intervals = len(intervals)
+    with open("new.csv", "a") as f:
+            test = str(concatemer_id) + ',' + str(the_enzyme) +',' + str(num_intervals) + '\n'
+            f.write(test)
 
     for idx, (start, end) in enumerate(intervals):
         read = copy.copy(align)
@@ -162,16 +167,13 @@ def get_concatemer_seqs(input_file, enzyme, remove_tags=None):
     logger.info(f"Digesting unaligned sequences from {input_file}")
     n_concatemers = 0
     n_monomers = 0
-    import sys
     if os.path.isfile(enzyme):
         with open(enzyme) as f:
             cutters = f.read().split('\n')
             list_of_cutters = cutters
         enzyme = list_of_cutters
-        #enzyme = get_enzyme("NlaIII")
         logger.info(enzyme)
-
-    else: 
+    else:
         enzyme = get_enzyme(enzyme)
     tags_remove = {"mv"}
     if remove_tags:
