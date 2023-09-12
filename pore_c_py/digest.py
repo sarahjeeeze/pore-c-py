@@ -168,7 +168,8 @@ def get_concatemer_seqs(input_file, enzyme, remove_tags=None):
     logger.info(f"Digesting unaligned sequences from {input_file}")
     n_concatemers = 0
     n_monomers = 0
-    
+    # create a per concatemer file
+    open("per_concatemer_counts.csv", "w")
     if os.path.isfile(enzyme):
         with open(enzyme) as f:
             cutters = f.read().split('\n')
